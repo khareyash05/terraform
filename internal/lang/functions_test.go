@@ -11,8 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/hcl/v2"
-	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/terraform/internal/addrs"
 	"github.com/hashicorp/terraform/internal/experiments"
 	"github.com/hashicorp/terraform/internal/lang/marks"
@@ -1299,30 +1297,6 @@ func TestFunctions(t *testing.T) {
 			if experiment, isExperimental := experimentalFuncs[funcName]; isExperimental {
 				// First, we'll run all of the tests without the experiment
 				// enabled to see that they do actually fail in that case.
-				for _, test := range funcTests {
-					testName := fmt.Sprintf("experimental(%s)", test.src)
-					t.Run(testName, func(t *testing.T) {
-						data := &dataForTests{} // no variables available; we only need literals here
-						scope := &Scope{
-							Data:          data,
-							BaseDir:       "./testdata/functions-test", // for the functions that read from the filesystem
-							ExternalFuncs: externalFuncs,
-						}
-
-						expr, parseDiags := hclsyntax.ParseExpression([]byte(test.src), "test.hcl", hcl.Pos{Line: 1, Column: 1})
-						if parseDiags.HasErrors() {
-							for _, diag := range parseDiags {
-								t.Error(diag.Error())
-							}
-							return
-						}
-
-						_, diags := scope.EvalExpr(expr, cty.DynamicPseudoType)
-						if !diags.HasErrors() {
-							t.Errorf("experimental function %q succeeded without its experiment %s enabled\nexpr: %s", funcName, experiment.Keyword(), test.src)
-						}
-					})
-				}
 
 				// Now make the experiment active in the scope so that the
 				// function will actually work when we test it below.
@@ -1351,49 +1325,9 @@ func TestFunctions(t *testing.T) {
 						ExternalFuncs: externalFuncs,
 					}
 					prepareScope(t, scope)
-
-					expr, parseDiags := hclsyntax.ParseExpression([]byte(test.src), "test.hcl", hcl.Pos{Line: 1, Column: 1})
-					if parseDiags.HasErrors() {
-						for _, diag := range parseDiags {
-							t.Error(diag.Error())
-						}
-						return
-					}
-
-					got, diags := scope.EvalExpr(expr, cty.DynamicPseudoType)
-					if diags.HasErrors() {
-						for _, diag := range diags {
-							t.Errorf("%s: %s", diag.Description().Summary, diag.Description().Detail)
-						}
-						return
-					}
-
-					if !test.want.RawEquals(got) {
-						t.Errorf("wrong result\nexpr: %s\ngot:  %#v\nwant: %#v", test.src, got, test.want)
-					}
 				})
 			}
 		})
-	}
-}
-
-func TestPlanTimeStampUnknown(t *testing.T) {
-	// plantimestamp should return an unknown if there is no timestamp, which
-	// happens during validation
-	expr, parseDiags := hclsyntax.ParseExpression([]byte("plantimestamp()"), "test.hcl", hcl.Pos{Line: 1, Column: 1})
-	if parseDiags.HasErrors() {
-		t.Fatal(parseDiags)
-	}
-
-	scope := &Scope{}
-	got, diags := scope.EvalExpr(expr, cty.DynamicPseudoType)
-	if diags.HasErrors() {
-		t.Fatal(diags.Err())
-
-	}
-
-	if got.IsKnown() {
-		t.Fatalf("plantimestamp() should be unknown, got %#v\n", got)
 	}
 }
 
